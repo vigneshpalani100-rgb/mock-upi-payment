@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mock UPI QR Payment Lab</title>
+  <style>
+    :root { font-family: Arial, sans-serif; color: #172033; background: #f4f7fb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; }
+    main { max-width: 1080px; margin: auto; }
+    header { margin-bottom: 22px; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.6rem, 3vw, 2.2rem); }
+    .sub { color: #5d687c; line-height: 1.5; }
+    .notice { padding: 12px 14px; border: 1px solid #f0d58a; background: #fff8df; border-radius: 10px; margin: 16px 0 22px; }
+    .layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .card { background: white; border: 1px solid #e0e6ef; border-radius: 14px; padding: 20px; box-shadow: 0 4px 16px #1c2b4410; }
+    h2 { font-size: 1.15rem; margin: 0 0 16px; }
+    label { display: block; font-size: .92rem; font-weight: 700; margin: 12px 0 6px; }
+    input, select { width: 100%; padding: 11px 12px; border: 1px solid #cbd4e1; border-radius: 8px; font: inherit; background: white; }
+    button { border: 0; border-radius: 8px; padding: 11px 14px; font-weight: 700; cursor: pointer; margin: 8px 6px 0 0; }
+    button:focus, input:focus, select:focus { outline: 3px solid #93c5fd; outline-offset: 1px; }
+    .primary { background: #175cd3; color: white; }
+    .success { background: #13804a; color: white; }
+    .danger { background: #b42318; color: white; }
+    .secondary { background: #e9eef6; color: #23324a; }
+    .product { display: flex; gap: 14px; align-items: center; padding: 14px; border-radius: 10px; background: #f7f9fc; }
+    .laptop { width: 86px; height: 62px; border-radius: 7px; display: grid; place-items: center; background: #dbeafe; font-size: 2rem; }
+    .price { font-size: 1.4rem; font-weight: 800; margin-top: 6px; }
+    .qr-wrap { min-height: 220px; display: grid; place-items: center; padding: 12px; border: 1px dashed #b8c4d5; border-radius: 10px; background: #fbfcff; }
+    #qrcode { display: flex; justify-content: center; }
+    #qrcode canvas, #qrcode img { max-width: 100%; }
+    .muted { color: #68758a; font-size: .9rem; line-height: 1.45; }
+    .pill { display: inline-block; padding: 5px 9px; border-radius: 999px; background: #e9eef6; font-size: .82rem; font-weight: 700; }
+    .status { padding: 12px; background: #f7f9fc; border-radius: 9px; margin-top: 12px; overflow-wrap: anywhere; }
+    .status strong { display: block; margin-bottom: 4px; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #101828; color: #e4eaf4; border-radius: 9px; padding: 14px; min-height: 120px; font-size: .85rem; }
+    .full { grid-column: 1 / -1; }
+    .test-ids { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .test-ids span { background: #eef4ff; color: #244d91; border-radius: 6px; padding: 6px 8px; font: .8rem monospace; }
+    footer { color: #68758a; font-size: .85rem; padding: 18px 0 4px; }
+    @media (max-width: 760px) { body { padding: 14px; } .layout { grid-template-columns: 1fr; } .full { grid-column: auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Mock UPI QR Payment Lab</h1>
+    <div class="sub">A local demo UI for practising API test design and Playwright browser automation.</div>
+    <div class="notice"><strong>Demo only:</strong> No real UPI payment is made. Do not enter real bank details or use this QR to send money.</div>
+  </header>
+
+  <div class="layout">
+    <section class="card" aria-labelledby="product-heading">
+      <h2 id="product-heading">1. Product and payment request</h2>
+      <div class="product">
+        <div class="laptop" aria-hidden="true">💻</div>
+        <div><strong>HP Laptop (demo product)</strong><div class="price" id="product-price">₹50,000.00</div><div class="muted">Product ID: HP-LAPTOP-001</div></div>
+      </div>
+      <label for="amount">Payment amount (INR)</label>
+      <input id="amount" type="number" min="1" max="200000" step="1" value="50000" />
+      <label for="merchant">Demo merchant VPA</label>
+      <input id="merchant" value="demo.merchant@upi" autocomplete="off" />
+      <button id="create-payment" class="primary">Create QR payment</button>
+      <div class="status" aria-live="polite">
+        <strong>Payment request</strong>
+        <div>Payment ID: <span id="payment-id">Not created</span></div>
+        <div>Status: <span id="payment-status" class="pill">NOT_CREATED</span></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="qr-heading">
+      <h2 id="qr-heading">2. QR code (mock payload)</h2>
+      <div class="qr-wrap"><div id="qrcode"><span class="muted">Create a payment request to generate the demo QR.</span></div></div>
+      <p class="muted">The QR contains a fictional UPI URI for testing only. It does not initiate or complete a real payment.</p>
+      <label for="qr-payload">Encoded QR payload</label>
+      <input id="qr-payload" readonly value="" aria-label="Encoded QR payload" />
+      <button id="copy-payload" class="secondary">Copy payload</button>
+    </section>
+
+    <section class="card" aria-labelledby="bank-heading">
+      <h2 id="bank-heading">3. Select a mock linked bank account</h2>
+      <label for="bank-account">Demo bank account</label>
+      <select id="bank-account">
+        <option value="bank-a">Demo Bank A — available ₹75,000</option>
+        <option value="bank-b">Demo Bank B — available ₹25,000</option>
+        <option value="bank-c">Demo Bank C — available ₹0</option>
+      </select>
+      <div class="status">
+        <strong>Available demo balance</strong>
+        <span id="balance">₹75,000.00</span>
+      </div>
+      <p class="muted">All account names and balances are fictional and stored only in this page's JavaScript.</p>
+      <button id="check-balance" class="secondary">Check balance</button>
+      <button id="pay-success" class="success">Simulate successful payment</button>
+      <button id="pay-fail" class="danger">Simulate failed payment</button>
+      <div id="payment-message" class="status" aria-live="polite">Create a payment request first.</div>
+    </section>
+
+    <section class="card" aria-labelledby="api-heading">
+      <h2 id="api-heading">4. API test reference</h2>
+      <p class="muted">This standalone HTML page simulates API responses in the browser. It does not expose real HTTP endpoints. Use the examples below to build Playwright API tests against a mock server you control.</p>
+      <div class="test-ids">
+        <span>POST /api/payments/qr</span>
+        <span>GET /api/accounts</span>
+        <span>GET /api/accounts/:id/balance</span>
+        <span>POST /api/payments/:id/confirm</span>
+      </div>
+      <p class="muted">Suggested cases: valid amount, zero/negative amount, invalid merchant, sufficient balance, insufficient balance, missing auth, duplicate confirmation, unknown payment ID.</p>
+      <button id="show-example" class="secondary">Show sample API response</button>
+      <pre id="api-response" aria-live="polite">Click “Show sample API response” or create a QR payment request.</pre>
+    </section>
+  </div>
+  <footer>Mock UPI QR Payment Lab · Front-end-only practice page · No backend, bank connection, or actual payment processing.</footer>
+</main>
+
+<!-- QRCode.js generates a QR image locally in the browser. If offline, download qrcode.min.js and reference it locally. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(() => {
+  const accounts = {
+    "bank-a": { id: "bank-a", name: "Demo Bank A", balance: 75000 },
+    "bank-b": { id: "bank-b", name: "Demo Bank B", balance: 25000 },
+    "bank-c": { id: "bank-c", name: "Demo Bank C", balance: 0 }
+  };
+  let currentPayment = null;
+  const $ = (id) => document.getElementById(id);
+  const inr = (n) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(n);
+  const makeId = () => "MOCKPAY-" + Date.now().toString().slice(-8);
+
+  function response(status, body) {
+    $("api-response").textContent = JSON.stringify({ status, body }, null, 2);
+  }
+
+  function selectedAccount() {
+    return accounts[$("bank-account").value];
+  }
+
+  function updateBalance() {
+    $("balance").textContent = inr(selectedAccount().balance);
+  }
+
+  function updatePaymentStatus(status) {
+    $("payment-status").textContent = status;
+    if (currentPayment) currentPayment.status = status;
+  }
+
+  $("bank-account").addEventListener("change", updateBalance);
+
+  $("create-payment").addEventListener("click", () => {
+    const amount = Number($("amount").value);
+    const merchant = $("merchant").value.trim();
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 200000 || !Number.isInteger(amount)) {
+      $("payment-message").textContent = "Validation error: amount must be a whole number between ₹1 and ₹2,00,000.";
+      response(400, { error: "INVALID_AMOUNT", message: "Amount must be an integer from 1 to 200000 INR." });
+      return;
+    }
+    if (!/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+$/.test(merchant)) {
+      $("payment-message").textContent = "Validation error: enter a demo VPA in the format name@upi.";
+      response(400, { error: "INVALID_MERCHANT_VPA" });
+      return;
+    }
+    const paymentId = makeId();
+    const payload = `upi://pay?pa=${encodeURIComponent(merchant)}&pn=${encodeURIComponent("Demo Store")}&am=${amount}&cu=INR&tn=${encodeURIComponent("Mock payment " + paymentId)}`;
+    currentPayment = { paymentId, productId: "HP-LAPTOP-001", amount, currency: "INR", paymentMethod: "UPI_QR", qrPayload: payload, status: "PENDING" };
+    $("product-price").textContent = inr(amount);
+    $("payment-id").textContent = paymentId;
+    updatePaymentStatus("PENDING");
+    $("qr-payload").value = payload;
+    $("qrcode").innerHTML = "";
+    if (window.QRCode) {
+      new QRCode($("qrcode"), { text: payload, width: 190, height: 190, correctLevel: QRCode.CorrectLevel.M });
+    } else {
+      $("qrcode").textContent = "QR library unavailable. Payload is shown below; connect to the internet or host qrcode.min.js locally.";
+    }
+    $("payment-message").textContent = "QR request created. Choose a mock bank account and simulate a payment.";
+    response(201, currentPayment);
+  });
+
+  $("check-balance").addEventListener("click", () => {
+    const a = selectedAccount();
+    response(200, { accountId: a.id, bankName: a.name, availableBalance: a.balance, currency: "INR" });
+    $("payment-message").textContent = `${a.name}: available balance ${inr(a.balance)}.`;
+  });
+
+  function simulatePayment(forceFailure) {
+    if (!currentPayment) {
+      $("payment-message").textContent = "Create a payment request first.";
+      response(400, { error: "PAYMENT_NOT_CREATED" });
+      return;
+    }
+    const a = selectedAccount();
+    if (forceFailure) {
+      updatePaymentStatus("FAILED");
+      $("payment-message").textContent = "Simulated failure. No balance was changed.";
+      response(200, { paymentId: currentPayment.paymentId, status: "FAILED", reason: "SIMULATED_FAILURE", debited: false });
+      return;
+    }
+    if (currentPayment.status === "SUCCESS") {
+      $("payment-message").textContent = "This mock payment was already confirmed.";
+      response(409, { error: "DUPLICATE_CONFIRMATION", paymentId: currentPayment.paymentId, status: "SUCCESS" });
+      return;
+    }
+    if (a.balance < currentPayment.amount) {
+      updatePaymentStatus("FAILED");
+      $("payment-message").textContent = `Insufficient demo balance in ${a.name}. No balance was changed.`;
+      response(402, { paymentId: currentPayment.paymentId, status: "FAILED", reason: "INSUFFICIENT_BALANCE", availableBalance: a.balance, requiredAmount: currentPayment.amount, debited: false });
+      return;
+    }
+    a.balance -= currentPayment.amount;
+    updateBalance();
+    updatePaymentStatus("SUCCESS");
+    $("payment-message").textContent = `Mock payment successful. ${inr(currentPayment.amount)} deducted from the in-page demo balance only.`;
+    response(200, { paymentId: currentPayment.paymentId, status: "SUCCESS", transactionId: "MOCKTXN-" + Date.now().toString().slice(-8), accountId: a.id, amount: currentPayment.amount, currency: "INR", debited: true, demoOnly: true });
+  }
+
+  $("pay-success").addEventListener("click", () => simulatePayment(false));
+  $("pay-fail").addEventListener("click", () => simulatePayment(true));
+
+  $("copy-payload").addEventListener("click", async () => {
+    const value = $("qr-payload").value;
+    if (!value) { $("payment-message").textContent = "Create a payment request before copying the payload."; return; }
+    try {
+      await navigator.clipboard.writeText(value);
+      $("payment-message").textContent = "Mock QR payload copied.";
+    } catch (_) {
+      $("qr-payload").select();
+      $("payment-message").textContent = "Payload selected. Copy it using Ctrl+C.";
+    }
+  });
+
+  $("show-example").addEventListener("click", () => {
+    response(201, {
+      paymentId: "MOCKPAY-12345678",
+      productId: "HP-LAPTOP-001",
+      amount: 50000,
+      currency: "INR",
+      paymentMethod: "UPI_QR",
+      qrPayload: "upi://pay?pa=demo.merchant%40upi&pn=Demo%20Store&am=50000&cu=INR",
+      status: "PENDING",
+      demoOnly: true
+    });
+  });
+
+  updateBalance();
+})();
+</script>
+</body>
+</html>
